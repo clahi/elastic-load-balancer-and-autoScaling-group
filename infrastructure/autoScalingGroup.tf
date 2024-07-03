@@ -36,6 +36,30 @@ resource "aws_vpc_security_group_ingress_rule" "allow-ssh" {
   cidr_ipv4         = "0.0.0.0/0"
 }
 
+resource "aws_lb" "webServer-alb" {
+  name               = "webServer-alb"
+  security_groups    = [aws_security_group.allow-http.id]
+  subnets            = [aws_subnet.public_subnet_1a.id, aws_subnet.public_subnet_1b.id]
+  load_balancer_type = "application"
+}
+
+resource "aws_lb_target_group" "webServer-tg" {
+  name     = "webServer-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+}
+
+resource "aws_lb_listener" "webServer-listener" {
+  load_balancer_arn = aws_lb.webServer-alb.arn
+  port              = "80"
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.webServer-tg.arn
+  }
+}
+
 data "aws_ami" "amazon-linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -65,9 +89,13 @@ resource "aws_launch_template" "ec2_launch_template" {
 
 resource "aws_autoscaling_group" "autoscaling_group" {
   name = "autoscaling_group"
+  vpc_zone_identifier = [aws_subnet.public_subnet_1a.id, aws_subnet.public_subnet_1b.id]
+
   desired_capacity = 2
   max_size = 2
   min_size = 2
+
+  target_group_arns = [aws_lb_target_group.webServer-tg.arn]
 
   launch_template {
     id = aws_launch_template.ec2_launch_template.id
