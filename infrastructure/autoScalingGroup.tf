@@ -75,6 +75,52 @@ data "aws_ami" "amazon-linux" {
   }
 }
 
+resource "aws_iam_role" "ec2_role" {
+  name = "ec2_role"
+
+  # Terraform's "jsonencode" function converts a Terraform expression result to valid JSON syntax
+    assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+            {
+                Action = "sts:AssumeRole"
+                Effect = "Allow"
+                Sid = ""
+                Principal = {
+                    Service = "ec2.amazonaws.com"
+                }
+            }
+        ]
+    })
+}
+
+resource "aws_iam_policy" "ec2_policy" {
+  name = "ec2_policy"
+  description = "Policy to allow ec2 servers to read objects in s3"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+        {
+            Effect = "Allow",
+            Action = [
+                "s3:GetObject"
+            ],
+            Resource = "*"
+        }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "policy_attachmet" {
+  role = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.ec2_policy.arn
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "ec2_profile"
+  role = aws_iam_role.ec2_role.name
+}
 
 resource "aws_launch_template" "ec2_launch_template" {
   name = "ec2_launch_template"
@@ -83,6 +129,9 @@ resource "aws_launch_template" "ec2_launch_template" {
   
   vpc_security_group_ids = [aws_security_group.allow-http.id]
 
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_profile.name
+  }
   key_name = aws_key_pair.demo-key.key_name
   user_data = filebase64("scripts/user_data.sh")
 }
