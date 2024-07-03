@@ -79,41 +79,41 @@ resource "aws_iam_role" "ec2_role" {
   name = "ec2_role"
 
   # Terraform's "jsonencode" function converts a Terraform expression result to valid JSON syntax
-    assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [
-            {
-                Action = "sts:AssumeRole"
-                Effect = "Allow"
-                Sid = ""
-                Principal = {
-                    Service = "ec2.amazonaws.com"
-                }
-            }
-        ]
-    })
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Sid    = ""
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
 }
 
 resource "aws_iam_policy" "ec2_policy" {
-  name = "ec2_policy"
+  name        = "ec2_policy"
   description = "Policy to allow ec2 servers to read objects in s3"
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-        {
-            Effect = "Allow",
-            Action = [
-                "s3:GetObject"
-            ],
-            Resource = "*"
-        }
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject"
+        ],
+        Resource = "*"
+      }
     ]
   })
 }
 
 resource "aws_iam_role_policy_attachment" "policy_attachmet" {
-  role = aws_iam_role.ec2_role.name
+  role       = aws_iam_role.ec2_role.name
   policy_arn = aws_iam_policy.ec2_policy.arn
 }
 
@@ -123,31 +123,31 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 }
 
 resource "aws_launch_template" "ec2_launch_template" {
-  name = "ec2_launch_template"
-  image_id = data.aws_ami.amazon-linux.id
+  name          = "ec2_launch_template"
+  image_id      = data.aws_ami.amazon-linux.id
   instance_type = var.instance_type
-  
+
   vpc_security_group_ids = [aws_security_group.allow-http.id]
 
   iam_instance_profile {
     name = aws_iam_instance_profile.ec2_profile.name
   }
-  key_name = aws_key_pair.demo-key.key_name
+  key_name  = aws_key_pair.demo-key.key_name
   user_data = filebase64("scripts/user_data.sh")
 }
 
 resource "aws_autoscaling_group" "autoscaling_group" {
-  name = "autoscaling_group"
+  name                = "autoscaling_group"
   vpc_zone_identifier = [aws_subnet.public_subnet_1a.id, aws_subnet.public_subnet_1b.id]
 
   desired_capacity = 2
-  max_size = 2
-  min_size = 2
+  max_size         = 2
+  min_size         = 2
 
   target_group_arns = [aws_lb_target_group.webServer-tg.arn]
 
   launch_template {
-    id = aws_launch_template.ec2_launch_template.id
+    id      = aws_launch_template.ec2_launch_template.id
     version = "$Latest"
   }
 }
